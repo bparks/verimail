@@ -80,4 +80,4 @@ var server = net.createServer(function(socket) {
 	//	case in which 'ALLOW' should be treated differently from 'YES' is in
 	//  SPAM filters: 'YES' should ALWAYS be treated as non-SPAM, while 'ALLOW'
 	//  should cause normal SPAM checking)
-}).listen(1337);
+}).listen(26);
