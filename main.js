@@ -10,6 +10,8 @@ console.log('Starting verimail 0.0.1');
 console.log('Copyright (c) 2013 Synapse Software');
 
 /** Configuration */
+//port = 26;
+port = 2026;
 permittedHosts = [
 	'mail.synapsesoftware.net',
 	'localhost', // It's probably a bad idea NOT to have localhost in this list...
@@ -80,4 +82,4 @@ var server = net.createServer(function(socket) {
 	//	case in which 'ALLOW' should be treated differently from 'YES' is in
 	//  SPAM filters: 'YES' should ALWAYS be treated as non-SPAM, while 'ALLOW'
 	//  should cause normal SPAM checking)
-}).listen(26);
+}).listen(port);
