@@ -1,0 +1,33 @@
+{
+	"name": "verimail",
+	"preferGlobal": true,
+	"version": "0.0.1",
+	"author": "Synapse Software <support@synapsesoftware.com>",
+	"description": "",
+	"contributors": [
+		{
+			"name": "Brian Parks",
+			"email": "bparks@synapsesoftware.com"
+		}
+	],
+	"bin": {
+		"verimail": "./tools/server"
+	},
+	"scripts": {
+		"setup": "./tools/setup",
+		"test": "node test.js",
+		"start": "node main.js"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/bparks/verimail.git"
+	},
+	"keywords": ["mail", "service"],
+	"dependencies": {
+		"ursa": "0.8.0"
+	},
+	"license": "GPLv3",
+	"engines": {
+		"node": ">=0.10"
+	}
+}

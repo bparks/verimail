@@ -1,0 +1,4 @@
+#!/bin/sh
+
+openssl genrsa -out rsa.private 2048
+openssl rsa -in rsa.private -pubout > rsa.public
