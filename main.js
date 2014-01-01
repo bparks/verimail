@@ -20,24 +20,23 @@ function log_entry(level, message) {
 /** End utilities */
 
 var net = require('net'),
+	fs = require('fs'),
+	rsa = require('ursa'),
     permittedHosts = config.permittedHosts,
     rules = config.rules;
 
 function decodePayload(payload, cb) {
 	try {
-		var rsaPublic = fs.readFileSync("rsa.public", 'ascii'),
-			rsaPrivate = fs.readFileSync("rsa.private", 'ascii'),
-			passphrase = "foobar",
-			keypair = rsa.createRsaKeypair({
-				publicKey: rsaPublic,
-				privateKey: rsaPrivate,
-				passphrase: config.passphrase
-			}),
-			decrypted = keypair.decrypt(ciphertext, 'hex', 'utf8'),
+		//http://stackoverflow.com/questions/8750780/encrypting-data-with-public-key-in-node-js
+		var rsaPrivate = fs.readFileSync("rsa.private", 'ascii'),
+			privkey = rsa.createPrivateKey(rsaPrivate, config.passphrase, 'utf8'),
+			decrypted = privkey.decrypt(payload, 'hex', 'utf8'),
 			parts = decrypted.split(' ');
 
-		cb.call(parts);
+		log_entry(loglevel.DEBUG, decrypted);
+		cb(parts[0], parts[1], parts[2]);
 	} catch (err) {
+		log_entry(loglevel.ERROR, err);
 		cb('', '', ''); //Bypass the system and cause NO/ALLOW to get sent
 	}
 }
@@ -60,15 +59,20 @@ var server = net.createServer(function(socket) {
 		var ruleSet = rq[0] in rules ? rules[rq[0]] : rules['*'];
 
 		var allPermittedHosts = permittedHosts ? permittedHosts : [];
-		if (('permittedHosts' in ruleSet) && ruleSet['permittedHosts'] && ruleSet['permittedHosts'].length)
-			allPermittedHosts.push(ruleSet['permittedHosts']);
+		if ('permittedHosts' in ruleSet) {
+			if (ruleSet['permittedHosts'] && ruleSet['permittedHosts'].length) {
+				allPermittedHosts.push(ruleSet['permittedHosts']);
+			} else if (ruleSet['permittedHosts'] === false) {
+				allPermittedHosts = [];
+			}
+		}
 		log_entry(loglevel.DEBUG, "Permitted hosts for user '"+rq[0]+"': " + allPermittedHosts);
-		log_entry(loglevel.DEBUG, "Looking for '"+rq[1]+"'");
 
 		//Here we decode the payload into:
 		//sending_host receiving_host nonce
 		decodePayload(rq[1], function(send_host, rcpt_host, nonce) {
 			//Here we check to make sure sending_host is in our rules list
+			log_entry(loglevel.DEBUG, "Looking for '"+send_host+"'");
 			if (allPermittedHosts.indexOf(send_host) < 0) {
 				//Sorry. This host is not authorized to send mail for the given user
 				if (ruleSet['allowUnauthorizedMail'])
