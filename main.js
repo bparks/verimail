@@ -9,27 +9,7 @@
 console.log('Starting verimail 0.0.1');
 console.log('Copyright (c) 2013 Synapse Software');
 
-/** Configuration */
-//port = 26;
-port = 2026;
-permittedHosts = [
-	'mail.synapsesoftware.net',
-	'localhost', // It's probably a bad idea NOT to have localhost in this list...
-	'127.0.0.1'  // Same with the local IP
-	// NOTE WELL that failing to use the actual remote IP on the recipient server side
-	// essentially makes all of this checking useless -- why WOULDN'T an imposter just
-	// use 'mail.targetdomain.tld' as its HELO?
-];
-rules = {
-	'bparks' : {
-		permittedHosts: null, //Use global permittedHosts (false)
-		allowUnauthorizedMail: false //If it doesn't pass validation, give NO (default)
-	},
-	'*' : { //Rules for all other names
-		permittedHosts: [] //Nobody can send mail as these addresses
-	}
-}
-/** End configuration */
+var config = require('./config');
 
 /** Utilties */
 loglevel = { INFO: 'INFO', WARN: 'WARN', DEBUG: 'DEBUG', ERROR: 'ERROR'};
@@ -39,7 +19,28 @@ function log_entry(level, message) {
 }
 /** End utilities */
 
-var net = require('net');
+var net = require('net'),
+    permittedHosts = config.permittedHosts,
+    rules = config.rules;
+
+function decodePayload(payload, cb) {
+	try {
+		var rsaPublic = fs.readFileSync("rsa.public", 'ascii'),
+			rsaPrivate = fs.readFileSync("rsa.private", 'ascii'),
+			passphrase = "foobar",
+			keypair = rsa.createRsaKeypair({
+				publicKey: rsaPublic,
+				privateKey: rsaPrivate,
+				passphrase: config.passphrase
+			}),
+			decrypted = keypair.decrypt(ciphertext, 'hex', 'utf8'),
+			parts = decrypted.split(' ');
+
+		cb.call(parts);
+	} catch (err) {
+		cb('', '', ''); //Bypass the system and cause NO/ALLOW to get sent
+	}
+}
 
 var server = net.createServer(function(socket) {
 	log_entry(loglevel.INFO, "Connection from " + socket.address());
@@ -63,15 +64,21 @@ var server = net.createServer(function(socket) {
 			allPermittedHosts.push(ruleSet['permittedHosts']);
 		log_entry(loglevel.DEBUG, "Permitted hosts for user '"+rq[0]+"': " + allPermittedHosts);
 		log_entry(loglevel.DEBUG, "Looking for '"+rq[1]+"'");
-		if (allPermittedHosts.indexOf(rq[1]) < 0) {
-			//Sorry. This host is not authorized to send mail for the given user
-			if (ruleSet['allowUnauthorizedMail'])
-				return socket.end('ALLOW\r\n');
-			else
-				return socket.end('NO\r\n');
-		}
-		//Well, none of the checks have found it to be invalid. Must be OK
-		return socket.end('YES\r\n');
+
+		//Here we decode the payload into:
+		//sending_host receiving_host nonce
+		decodePayload(rq[1], function(send_host, rcpt_host, nonce) {
+			//Here we check to make sure sending_host is in our rules list
+			if (allPermittedHosts.indexOf(send_host) < 0) {
+				//Sorry. This host is not authorized to send mail for the given user
+				if (ruleSet['allowUnauthorizedMail'])
+					return socket.end('ALLOW\r\n');
+				else
+					return socket.end('NO\r\n');
+			}
+			//Well, none of the checks have found it to be invalid. Must be OK
+			return socket.end('YES\r\n');
+		});
 	});
 
 	//NO - The given machine does not have authority to send mail from this address
@@ -82,4 +89,4 @@ var server = net.createServer(function(socket) {
 	//	case in which 'ALLOW' should be treated differently from 'YES' is in
 	//  SPAM filters: 'YES' should ALWAYS be treated as non-SPAM, while 'ALLOW'
 	//  should cause normal SPAM checking)
-}).listen(port);
+}).listen(config.port);
